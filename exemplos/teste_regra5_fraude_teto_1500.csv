@@ -1,0 +1,5 @@
+Id,TipoProcedimento,DataProcedimento,ValorPago,ClienteId
+1,Exame de Imagem,2024-04-12,600,CLIENTE_FRAUDE_VALOR
+2,Consulta Médica,2024-04-18,700,CLIENTE_FRAUDE_VALOR
+3,Consulta Médica,2024-04-25,600,CLIENTE_FRAUDE_VALOR
+4,Exame Laboratorial,2024-05-02,100,CLIENTE_FRAUDE_VALOR

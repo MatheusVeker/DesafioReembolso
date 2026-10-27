@@ -1,0 +1,6 @@
+﻿@DesafioReembolso.Api_HostAddress = http://localhost:5244
+
+GET {{DesafioReembolso.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

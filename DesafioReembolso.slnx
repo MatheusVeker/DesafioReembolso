@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DesafioReembolso.Api/DesafioReembolso.Api.csproj" />
+    <Project Path="src/DesafioReembolso.Application/DesafioReembolso.Application.csproj" />
+    <Project Path="src/DesafioReembolso.Cli/DesafioReembolso.Cli.csproj" />
+    <Project Path="src/DesafioReembolso.Core/DesafioReembolso.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DesafioReembolso.Tests/DesafioReembolso.Tests.csproj" />
+  </Folder>
+</Solution>

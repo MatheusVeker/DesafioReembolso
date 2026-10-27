@@ -1,0 +1,8 @@
+Id,TipoProcedimento,DataProcedimento,ValorPago,ClienteId
+1,Consulta Médica,2024-04-12,50,CLIENTE_FRAUDE_QTD
+2,Consulta Médica,2024-04-15,50,CLIENTE_FRAUDE_QTD
+3,Consulta Médica,2024-04-18,50,CLIENTE_FRAUDE_QTD
+4,Consulta Médica,2024-04-20,50,CLIENTE_FRAUDE_QTD
+5,Consulta Médica,2024-04-25,50,CLIENTE_FRAUDE_QTD
+6,Consulta Médica,2024-04-28,50,CLIENTE_FRAUDE_QTD
+7,Consulta Médica,2024-05-02,50,CLIENTE_FRAUDE_QTD

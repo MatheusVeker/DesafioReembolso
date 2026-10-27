@@ -1,0 +1,5 @@
+Id,TipoProcedimento,DataProcedimento,ValorPago,ClienteId
+1,Consulta Médica,2024-02-10,300,CLIENTE_PRAZO_1
+2,Consulta Médica,2024-02-09,300,CLIENTE_PRAZO_2
+3,Exame de Imagem,2024-01-05,500,CLIENTE_PRAZO_3
+4,Exame Laboratorial,2024-05-20,200,CLIENTE_PRAZO_4
