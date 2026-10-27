@@ -1,14 +1,16 @@
-# Desafio Reembolso - Processamento de Reembolsos em Lote
+# Desafio Optino - Processamento de Reembolsos
 
-Sistema corporativo para processamento de pedidos de reembolso de despesas de saúde em lote, com aplicação de regras de negócio, limites por procedimento e motor de prevenção a fraudes.
+O projeto foi desenvolvido para atender aos requisitos especificados no enunciado do desafio.
 
-A solução é composta por:
-1. **Core / Application (.NET):** Regras de negócio puras, cálculos de reembolso e validações desacopladas de frameworks e I/O.
-2. **CLI (.NET):** Aplicação de linha de comando para processamento via `stdin` e geração de CSV em `stdout`.
-3. **API HTTP (ASP.NET Core):** Serviço web REST com suporte a importação de CSV via `multipart/form-data`, payloads JSON e exportação de resultados.
-4. **Testes Automatizados (xUnit + FluentAssertions + WebApplicationFactory):** Cobertura abrangente de testes unitários e de integração.
-5. **Frontend (React + TypeScript):** Interface web moderna, acessível e responsiva em React 19 com Vite e Vanilla CSS.
+### Arquitetura da Solução
 
+A solução é estruturada em:
+
+* **Core & Application (.NET):** Regras de negócio e cálculos de reembolso totalmente desacoplados de infraestrutura e I/O.
+* **CLI (.NET):** Processamento em lote com leitura via `stdin` e saída de resultados em `stdout`.
+* **API REST (ASP.NET Core):** Endpoints para importação/exportação de CSV (`multipart/form-data`) e suporte a payloads JSON.
+* **Testes (xUnit):** Cobertura unitária e de integração (utilizando FluentAssertions e WebApplicationFactory).
+* **Frontend (React 19 + TypeScript):** Interface SPA construída com Vite e Vanilla CSS.
 ---
 
 ## 🏛️ Arquitetura e Decisões Técnicas
@@ -66,7 +68,7 @@ DesafioReembolso/
 
 ### Justificativa de Bibliotecas e Frameworks Utilizados
 
-- **.NET (C#) e ASP.NET Core:** Escolhido por seu alto desempenho nativo, tipagem estática robusta, excelente ecossistema para APIs de alta confiabilidade e suporte cross-platform.
+- **.NET (C#) e ASP.NET Core:** Escolhido por seu desempenho nativo, tipagem estática robusta, excelente ecossistema para APIs de alta confiabilidade e suporte cross-platform.
 - **FluentAssertions (Testes):** Facilita a leitura e manutenibilidade dos testes com assertivas expressivas e relatórios claros de falhas.
 - **Microsoft.AspNetCore.Mvc.Testing (Testes de Integração):** Permite simular o pipeline HTTP completo da API em memória, sem depender de portas de rede abertas.
 - **System.Text.Json e System.Globalization (Nativos):** Sem dependência de bibliotecas de terceiros desnecessárias para JSON ou CSV, mantendo o backend enxuto e seguro.
@@ -78,10 +80,12 @@ DesafioReembolso/
 
 ## ⚖️ Decisões sobre Conflitos entre Regras e Valores Exibidos
 
-Conforme exigido na especificação, detalhamos as decisões de design adotadas para a resolução de conflitos e exibição de valores:
+Conforme exigido na especificação, detalhei as decisões de design adotadas para a resolução de conflitos e exibição de valores:
 
 ### 1. Ordem de Avaliação das Regras
 Para garantir que as regras sejam aplicadas de maneira determinística, segura e justa:
+
+![alt text](image.png)
 1. **Validação do Arquivo de Entrada:** Verifica a integridade do arquivo recebido. Se o arquivo estiver vazio, sem cabeçalho válido ou com linhas ausentes/corrompidas, a execução é interrompida com notificação clara ao usuário.
 2. **Ordenação Cronológica:** Os pedidos são ordenados internamente por `DataProcedimento` crescente (e índice de entrada para desempate). Isso garante que os procedimentos realizados primeiro tenham preferência de consumo das cotas.
 3. **Regra de Validade Temporal (90 dias):**
@@ -306,17 +310,53 @@ dotnet test tests/DesafioReembolso.Tests/DesafioReembolso.Tests.csproj
 - Integração ponta a ponta da API via `WebApplicationFactory` (`ReembolsosApiTests.cs`).
 - Simulação de throughput e auditoria de lote massivo com 10.000 pedidos (`SimulacaoLoteBenchmarkTests.cs`).
 
+## 💡 Notas Adicionais Relevantes e Desafios de Negócio
+
+Durante o desenvolvimento e análise dos requisitos, foram identificados cenários de fronteira  que envolvem regras de negócio, experiência do cliente e segurança operacional:
+
 ---
 
-## 📦 Preparação para Entrega (.zip)
+### 1. Teto de R$ 500,00 por Procedimento vs. Experiência do Cliente (SAC)
 
-Conforme a especificação do desafio, o arquivo para envio deve conter todo o código-fonte, manifests e lockfiles de dependências, **sem** as pastas de compilação e cache (`bin`, `obj`, `node_modules` e `dist`), ficando com tamanho muito inferior ao limite de 50 MB (geralmente abaixo de 2 MB).
+* **O Cenário:**  
+  Imagine uma consulta médica no valor de **R$ 1.000,00**. Pela regra de alíquota (80%), o reembolso calculado seria de **R$ 800,00**. No entanto, devido à regra do teto máximo de **R$ 500,00 por procedimento**, cortamos o valor excedente (R$ 300,00) e liberamos R$ 500,00.
 
-Para gerar o arquivo `.zip` limpo de entrega via terminal PowerShell:
+* **O Dilema de Negócio:**  
+  Pela especificação estrita do desafio, esse pedido recebe o status final de **`Aprovado`** com o valor de R$ 500,00. Contudo, sob a ótica de produto e suporte ao cliente:
+  * O segurado que pagou R$ 1.000,00 e conhece a porcentagem de 80% espera receber R$ 800,00.
+  * Ao ver o status simplesmente como "Aprovado" recebendo R$ 500,00 sem uma justificativa explícita no comprovante simples, a percepção inicial do cliente é de que **houve um erro de cálculo**.
+  * Isso tende a gerar um volume significativo de novos chamados.
 
-```powershell
-# No diretório raiz do projeto:
-$itensParaIncluir = Get-ChildItem -Exclude "bin", "obj", "node_modules", "dist", ".vs", "*.zip"
-Compress-Archive -Path $itensParaIncluir -DestinationPath "DesafioReembolso_Entrega.zip" -Force
-```
+* **Como Decidimos Fazer:**
+  1. **Conformidade com o Contrato do Desafio:** No arquivo CSV gerado (saída padrão do batch e da CLI), mantivemos estritamente os status exigidos pela especificação (`Aprovado`, `Rejeitado`, `Suspeito de Fraude`), garantindo 100% de compatibilidade com pipelines e testes automatizados de avaliação.
+  2. **Transparência no Domínio e Logs de Auditoria:** Criamos no domínio interno o motivo detalhado `MotivoStatus.AprovadoLimitadoPeloTeto` e a flag `AtingiuTetoMaximo`. Esses dados são expostos na API HTTP e no Frontend, permitindo ao operador do sistema identificar imediatamente que o corte ocorreu por aplicação do teto de R$ 500,00.
+  3. **Sugestão de Evolução de Produto:** Em um cenário de produção real, a recomendação arquitetural é adotar um status intermediário como **`Aprovado Parcialmente`** ou adicionar uma coluna obrigatória de `Observacao`/`Motivo` no extrato do beneficiário para sanar dúvidas proativamente e evitar gargalos.
 
+---
+
+### 2. Extrapolação do Limite Antifraude de R$ 1.500,00 em 30 Dias
+
+* **O Cenário:**  
+  Um cliente já possui **R$ 1.400,00** em reembolsos aprovados nos últimos 30 dias. Ele envia um novo pedido cujo valor de reembolso elegível é de **R$ 200,00**. Somando ao histórico recente, o total acumulado atingiria **R$ 1.600,00**, extrapolando o teto de R$ 1.500,00.
+
+* **O Dilema de Negócio:**  
+  O que fazer com esse novo pedido?
+  * *Opção A (Fatiamento):* Reembolsar parcialmente R$ 100,00 (atingindo exatamente os R$ 1.500,00 permitidos) e rejeitar/marcar como suspeito apenas os R$ 100,00 restantes?
+  * *Opção B (Atomicidade e Bloqueio Integral):* Marcar o pedido inteiro de R$ 200,00 como `Suspeito de Fraude`?
+
+* **Como Decidimos Fazer:**
+  1. **Princípio de Atomicidade e Mitigação de Risco:** Adotamos a **Opção B**. Em conformidade com a diretriz do enunciado (*"Os pedidos que ultrapassarem esse limite devem ser marcados como 'Suspeito de Fraude'"*) e com as melhores práticas de auditoria e compliance em saúde suplementar, uma transação que aciona gatilho de risco **não deve ser fracionada para aprovação parcial**.
+  2. **Segurança Operacional:** Dividir a transação violaria o propósito do motor de risco. Portanto, o pedido que provoca a extrapolação do teto é marcado integralmente como **`Suspeito de Fraude`** com valor reembolsado de R$ 0,00 efetivo para pagamento, sendo retido para conferência em mesa de auditoria humana.
+  3. **Preservação de Histórico:** Os pedidos anteriores legítimos (R$ 1.400,00) permanecem aprovados e não são alterados retroativamente, preservando o direito adquirido e a rastreabilidade cronológica dos eventos.
+
+---
+
+## 🤝 Considerações Finais & Contato
+
+Agradeço imensamente a oportunidade de desenvolver este projeto! Foi uma excelente experiência desenhar tanto o núcleo de processamento em lote quanto as integrações via CLI, API e interface web.
+
+Estou à total disposição para quaisquer esclarecimentos, dúvidas ou informações adicionais.
+
+* **Candidato:** Matheus Veker Camatta
+* **E-mail:** [matheusvekerc@gmail.com](mailto:matheusvekerc@gmail.com)
+* **Telefone / WhatsApp:** [(27) 99587-5682](tel:+5527995875682)
