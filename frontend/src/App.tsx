@@ -10,11 +10,13 @@ export default function App() {
   const [resultado, setResultado] = useState<ProcessarLoteResponse | null>(null);
   const [erro, setErro] = useState<{ mensagem: string; detalhes?: string[] } | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>('Todos');
+  const [filtroClienteId, setFiltroClienteId] = useState<string>('');
   const [paginaAtual, setPaginaAtual] = useState<number>(1);
   const itensPorPagina = 25;
 
   const fileInputId = useId();
   const dateInputId = useId();
+  const clientFilterInputId = useId();
 
   // Manipulação de seleção do arquivo
   const handleArquivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,21 +24,6 @@ export default function App() {
       setArquivo(e.target.files[0]);
       setErro(null);
     }
-  };
-
-  // Carregar CSV de exemplo oficial com 1 clique para facilidade de teste
-  const handleCarregarExemploOficial = () => {
-    const csvOficial = `Id,TipoProcedimento,DataProcedimento,ValorPago,ClienteId
-1,Consulta Médica,2024-02-10,400,123
-2,Exame de Imagem,2024-03-01,600,124
-3,Exame Laboratorial,2024-04-15,200,125
-4,Outros,2024-01-20,150,126`;
-
-    const blob = new Blob([csvOficial], { type: 'text/csv;charset=utf-8;' });
-    const file = new File([blob], 'pedidos_exemplo_oficial.csv', { type: 'text/csv' });
-    setArquivo(file);
-    setDataReferencia('2024-05-10');
-    setErro(null);
   };
 
   // Processamento do lote via API
@@ -146,8 +133,10 @@ export default function App() {
 
   // Filtragem dos pedidos na interface
   const pedidosFiltrados = (resultado?.pedidos || []).filter((p) => {
-    if (filtroStatus === 'Todos') return true;
-    return p.status === filtroStatus;
+    const atendeStatus = filtroStatus === 'Todos' || p.status === filtroStatus;
+    const termoCliente = filtroClienteId.trim().toLowerCase();
+    const atendeCliente = !termoCliente || String(p.clienteId).toLowerCase().includes(termoCliente);
+    return atendeStatus && atendeCliente;
   });
 
   // Paginação dos resultados
@@ -169,14 +158,9 @@ export default function App() {
     <div className="app-container">
       {/* Cabeçalho */}
       <header className="app-header">
-        <div className="brand-badge">Sistema Corporativo de Saúde</div>
         <h1 className="app-title">
-          Processamento de <span className="highlight">Reembolsos em Lote</span>
+          Processamento de Reembolsos em Lote
         </h1>
-        <p className="app-subtitle">
-          Auditoria automatizada de despesas médicas com cálculo de alíquotas por procedimento,
-          limite de R$ 500, prazo de 90 dias e motor de prevenção a fraudes em 30 dias.
-        </p>
       </header>
 
       {/* Painel de Upload e Configuração */}
@@ -187,7 +171,6 @@ export default function App() {
           <div className="form-group">
             <label htmlFor={fileInputId} className="form-label">
               Arquivo de Pedidos (.csv)
-              <span className="helper">Separação por vírgula</span>
             </label>
             <div
               className="file-dropzone"
@@ -207,7 +190,13 @@ export default function App() {
                 onChange={handleArquivoChange}
                 disabled={processando}
               />
-              <span className="dropzone-icon" aria-hidden="true">📁</span>
+              <svg className="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
               <div className="dropzone-text">
                 <span className="dropzone-filename">
                   {arquivo ? arquivo.name : 'Selecione ou arraste o arquivo CSV'}
@@ -225,7 +214,6 @@ export default function App() {
           <div className="form-group">
             <label htmlFor={dateInputId} className="form-label">
               Data de Referência
-              <span className="helper">(Validação de 90 e 30 dias)</span>
             </label>
             <input
               id={dateInputId}
@@ -254,20 +242,12 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <span aria-hidden="true">⚡</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
                   <span>Processar Lote</span>
                 </>
               )}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleCarregarExemploOficial}
-              disabled={processando}
-              title="Carrega o arquivo CSV de exemplo oficial (4 pedidos)"
-            >
-              Exemplo Oficial
             </button>
           </div>
         </form>
@@ -277,14 +257,14 @@ export default function App() {
       {erro && (
         <section className="alert-card" role="alert" aria-live="assertive">
           <div className="alert-header">
-            <span>⚠️ {erro.mensagem}</span>
-            <button
-              type="button"
-              className="btn btn-outline-action"
-              onClick={() => handleProcessar()}
-            >
-              Tentar Novamente
-            </button>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{erro.mensagem}</span>
+            </span>
           </div>
           {erro.detalhes && erro.detalhes.length > 0 && (
             <ul className="alert-details">
@@ -324,7 +304,7 @@ export default function App() {
             <div className="metric-card">
               <span className="metric-label">Suspeitos de Fraude</span>
               <span className="metric-value suspeito">{resultado.totalSuspeitos}</span>
-              <span className="metric-sub">Limite de cota em 30 dias</span>
+              <span className="metric-sub">Retenção preventiva</span>
             </div>
           </section>
 
@@ -359,16 +339,59 @@ export default function App() {
               )}
             </div>
 
-            {/* Botão de Download do CSV Completo */}
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleBaixarCsv}
-              id="btn-baixar-csv"
-            >
-              <span aria-hidden="true">📥</span>
-              <span>Baixar CSV Completo ({resultado.totalProcessados})</span>
-            </button>
+            {/* Ações e Busca por Cliente */}
+            <div className="toolbar-actions">
+              <div className="search-box">
+                <label htmlFor={clientFilterInputId} className="visually-hidden">
+                  Filtrar por ID do Cliente
+                </label>
+                <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  id={clientFilterInputId}
+                  type="text"
+                  className="search-input"
+                  placeholder="Filtrar por ID do cliente..."
+                  value={filtroClienteId}
+                  onChange={(e) => {
+                    setFiltroClienteId(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                  aria-label="Filtrar pedidos por ID do cliente"
+                />
+                {filtroClienteId && (
+                  <button
+                    type="button"
+                    className="clear-search-btn"
+                    onClick={() => {
+                      setFiltroClienteId('');
+                      setPaginaAtual(1);
+                    }}
+                    title="Limpar filtro de cliente"
+                    aria-label="Limpar filtro de cliente"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Botão de Download do CSV Completo */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleBaixarCsv}
+                id="btn-baixar-csv"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Baixar CSV Completo ({resultado.totalProcessados})</span>
+              </button>
+            </div>
           </div>
 
           {/* Tabela de Pedidos Processados */}
@@ -392,15 +415,26 @@ export default function App() {
                       pedido.status === 'Aprovado'
                         ? 'status-aprovado'
                         : pedido.status === 'Rejeitado'
-                        ? 'status-rejeitado'
-                        : 'status-suspeito';
+                          ? 'status-rejeitado'
+                          : 'status-suspeito';
 
                     const statusIcon =
-                      pedido.status === 'Aprovado'
-                        ? '✓'
-                        : pedido.status === 'Rejeitado'
-                        ? '✕'
-                        : '⚠️';
+                      pedido.status === 'Aprovado' ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : pedido.status === 'Rejeitado' ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                          <line x1="12" y1="9" x2="12" y2="13" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                      );
 
                     return (
                       <tr key={pedido.id}>
@@ -422,7 +456,7 @@ export default function App() {
                         <td>
                           {/* Status diferenciado expressamente por TEXTO além de cores */}
                           <span className={`status-badge ${statusClass}`}>
-                            <span aria-hidden="true">{statusIcon}</span>
+                            {statusIcon}
                             <span>{pedido.status}</span>
                           </span>
                         </td>
@@ -433,11 +467,30 @@ export default function App() {
               </table>
             ) : (
               <div className="empty-state">
-                <span className="empty-icon">🔍</span>
+                <svg className="empty-icon" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
                 <div className="empty-title">Nenhum pedido encontrado</div>
                 <div className="empty-desc">
-                  Não há pedidos com o status <strong>{filtroStatus}</strong> neste lote.
+                  Nenhum pedido corresponde aos filtros aplicados
+                  {filtroStatus !== 'Todos' && <> (Status: <strong>{filtroStatus}</strong>)</>}
+                  {filtroClienteId.trim() && <> (Cliente ID: <strong>"{filtroClienteId.trim()}"</strong>)</>}.
                 </div>
+                {(filtroStatus !== 'Todos' || filtroClienteId.trim()) && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-outline-action"
+                    style={{ marginTop: '0.75rem' }}
+                    onClick={() => {
+                      setFiltroStatus('Todos');
+                      setFiltroClienteId('');
+                      setPaginaAtual(1);
+                    }}
+                  >
+                    Limpar Filtros
+                  </button>
+                )}
               </div>
             )}
 
@@ -479,20 +532,19 @@ export default function App() {
       {/* Estado Inicial (quando ainda não houve processamento) */}
       {!resultado && !processando && !erro && (
         <section className="panel empty-state">
-          <span className="empty-icon" aria-hidden="true">📋</span>
+          <svg className="empty-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
           <h2 className="empty-title">Pronto para processar seu primeiro lote</h2>
           <p className="empty-desc">
-            Selecione um arquivo CSV com os pedidos de reembolso ou clique no botão{' '}
-            <strong>"Exemplo Oficial"</strong> acima para carregar instantaneamente a amostra da especificação.
+            Selecione um arquivo CSV com os pedidos de reembolso e informe a data de referência para iniciar a auditoria do lote.
           </p>
         </section>
       )}
-
-      {/* Rodapé Informativo */}
-      <footer className="app-footer">
-        <div>Desafio Reembolso • Backend ASP.NET Core (.NET 10) &amp; Frontend React (TypeScript)</div>
-        <div>Clean Architecture • Prevenção a Fraudes • Auditoria em Lote</div>
-      </footer>
     </div>
   );
 }

@@ -1,8 +1,9 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using DesafioReembolso.Application;
 using DesafioReembolso.Application.Services;
+using DesafioReembolso.Core.Enums;
 using DesafioReembolso.Core.Services;
 
 namespace DesafioReembolso.Cli;
@@ -61,6 +62,32 @@ public static class Program
 
         // Processamento do lote utilizando o motor de regras compartilhado
         var resultado = processadorService.ProcessarLote(pedidos, dataReferencia);
+
+        // Logs de auditoria para pedidos rejeitados ou suspeitos de fraude (emitidos em stderr para não corromper o stdout do CSV)
+        var totalRejeitados = 0;
+        var totalSuspeitos = 0;
+
+        foreach (var pedido in resultado)
+        {
+            if (pedido.Status == StatusPedido.Rejeitado)
+            {
+                totalRejeitados++;
+                Console.Error.WriteLine(
+                    $"[AUDITORIA - REJEITADO] PedidoId: {pedido.Id} | ClienteId: {pedido.ClienteId} | Procedimento: {pedido.TipoProcedimento} | Data: {pedido.DataProcedimento:yyyy-MM-dd} | ValorPago: {pedido.ValorPago:F2} | Motivo: {pedido.MotivoDetalhe}");
+            }
+            else if (pedido.Status == StatusPedido.SuspeitoDeFraude)
+            {
+                totalSuspeitos++;
+                Console.Error.WriteLine(
+                    $"[AUDITORIA - SUSPEITA DE FRAUDE] PedidoId: {pedido.Id} | ClienteId: {pedido.ClienteId} | Procedimento: {pedido.TipoProcedimento} | Data: {pedido.DataProcedimento:yyyy-MM-dd} | ValorPago: {pedido.ValorPago:F2} | ValorCalculado: {pedido.ValorReembolsado:F2} | Motivo: {pedido.MotivoDetalhe}");
+            }
+        }
+
+        if (totalRejeitados > 0 || totalSuspeitos > 0)
+        {
+            Console.Error.WriteLine(
+                $"[AUDITORIA - RESUMO] DataReferencia: {dataReferencia:yyyy-MM-dd} | Total: {resultado.Count} | Aprovados: {resultado.Count - totalRejeitados - totalSuspeitos} | Rejeitados: {totalRejeitados} | Suspeitos: {totalSuspeitos}");
+        }
 
         // Escrita do CSV gerado no fluxo de saída padrão (stdout)
         csvService.EscreverCsv(resultado, Console.Out);

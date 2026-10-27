@@ -115,6 +115,11 @@ Adotamos essa mesma diretriz consistente:
 - **`ValorReembolsado`**: Reflete o valor calculado que teria direito pelas regras de alíquota e teto de R$ 500. Isso é fundamental para fins de **auditoria, rastreabilidade e transparência** (o usuário e o analista conseguem ver quanto foi pleiteado).
 - **Impacto no Saldo/Cota:** Pedidos marcados como `Rejeitado` ou `Suspeito de Fraude` **NÃO** somam no total reembolsado efetivo da API e **NÃO** bloqueiam futuros reembolsos válidos de outros pedidos.
 
+### 4. Auditoria e Logs Estruturados para Pedidos Rejeitados ou Suspeitos
+Para garantir total rastreabilidade, compliance e auditoria analítica:
+- **Na API HTTP (ASP.NET Core):** O `ReembolsosController` utiliza `ILogger` estruturado com severidade `Warning` para registrar cada ocorrência com `PedidoId`, `ClienteId`, `TipoProcedimento`, `DataProcedimento`, valores e o motivo detalhado da rejeição/retenção preventiva por suspeita de fraude, finalizando com um resumo informativo (`LogLevel.Information`) do lote.
+- **Na CLI (.NET):** Os registros de auditoria são direcionados para o fluxo de erro padrão (`stderr`). Isso garante que o `stdout` permaneça estritamente formatado com o CSV limpo para encadeamento em pipes e scripts (ex: `Get-Content pedidos.csv | dotnet run > resultado.csv`).
+
 ---
 
 ## 🚀 Como Compilar e Executar
@@ -266,7 +271,6 @@ npm run dev
 1. **Seleção de Arquivo e Data:**
    - Dropzone interativa para selecionar ou arrastar o arquivo `.csv`.
    - Campo para informar a data de referência (padrão predefinido: `2024-05-10`).
-   - Botão **"Exemplo Oficial"** para carregar em 1 clique o cenário do enunciado sem precisar buscar arquivos no computador.
 2. **Envio Protegido:**
    - O botão **"Processar Lote"** desabilita automaticamente durante a requisição, exibindo um *spinner* de carregamento e evitando envios duplicados.
 3. **Métricas e Cards de Resumo:**

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -155,5 +155,39 @@ public class ReembolsosApiTests : IClassFixture<WebApplicationFactory<Program>>
         var csv = await response.Content.ReadAsStringAsync();
         csv.Should().Contain("Id,TipoProcedimento,DataProcedimento,ValorPago,ValorReembolsado,ClienteId,Status");
         csv.Should().Contain("1,Consulta Médica,2024-02-10,400,320,123,Aprovado");
+    }
+
+    [Fact]
+    public async Task ProcessarLote_ComPedidosRejeitadosESuspeitos_DeveProcessarERegistrarAuditoriaComSucesso()
+    {
+        var dataRef = "2024-05-10";
+        var request = new ProcessarLoteRequest
+        {
+            DataReferencia = dataRef,
+            Pedidos = new List<PedidoInputDto>
+            {
+                // Pedidos dentro da janela de 30 dias para mesmo cliente que acumulam > R$ 1.500
+                new() { Id = 1, TipoProcedimento = "Exame de Imagem", DataProcedimento = "2024-04-20", ValorPago = 600m, ClienteId = "cliente-auditoria" },
+                new() { Id = 2, TipoProcedimento = "Exame de Imagem", DataProcedimento = "2024-04-21", ValorPago = 600m, ClienteId = "cliente-auditoria" },
+                new() { Id = 3, TipoProcedimento = "Exame de Imagem", DataProcedimento = "2024-04-22", ValorPago = 600m, ClienteId = "cliente-auditoria" },
+                new() { Id = 4, TipoProcedimento = "Consulta Médica", DataProcedimento = "2024-04-23", ValorPago = 200m, ClienteId = "cliente-auditoria" },
+                // Pedido fora do prazo (>90 dias)
+                new() { Id = 5, TipoProcedimento = "Outros", DataProcedimento = "2023-10-15", ValorPago = 300m, ClienteId = "cliente-antigo" }
+            }
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/reembolsos/processar-lote", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ProcessarLoteResponse>();
+
+        body.Should().NotBeNull();
+        body!.TotalProcessados.Should().Be(5);
+        body.TotalAprovados.Should().Be(3);
+        body.TotalSuspeitos.Should().Be(1);
+        body.TotalRejeitados.Should().Be(1);
+
+        body.Pedidos.First(p => p.Id == 4).Status.Should().Be("Suspeito de Fraude");
+        body.Pedidos.First(p => p.Id == 5).Status.Should().Be("Rejeitado");
     }
 }

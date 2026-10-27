@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using DesafioReembolso.Application.DTOs;
 using DesafioReembolso.Application.Services;
@@ -15,13 +15,16 @@ public sealed class ReembolsosController : ControllerBase
 {
     private readonly IProcessadorLoteService _processadorService;
     private readonly ICsvService _csvService;
+    private readonly ILogger<ReembolsosController> _logger;
 
     public ReembolsosController(
         IProcessadorLoteService processadorService,
-        ICsvService csvService)
+        ICsvService csvService,
+        ILogger<ReembolsosController> logger)
     {
         _processadorService = processadorService ?? throw new ArgumentNullException(nameof(processadorService));
         _csvService = csvService ?? throw new ArgumentNullException(nameof(csvService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -138,6 +141,7 @@ public sealed class ReembolsosController : ControllerBase
         }
 
         var processados = _processadorService.ProcessarLote(pedidosDominio, dataReferencia);
+        RegistrarLogsAuditoria(processados, dataReferencia);
         var response = MontarResposta(processados, dataReferencia);
 
         return Ok(response);
@@ -201,6 +205,7 @@ public sealed class ReembolsosController : ControllerBase
         }
 
         var processados = _processadorService.ProcessarLote(pedidos, dataRef);
+        RegistrarLogsAuditoria(processados, dataRef);
 
         // Se solicitado formato CSV de download direto
         if (string.Equals(formato, "csv", StringComparison.OrdinalIgnoreCase))
@@ -280,5 +285,54 @@ public sealed class ReembolsosController : ControllerBase
             ValorTotalReembolsadoAprovado = valorTotalAprovado,
             Pedidos = pedidosDto
         };
+    }
+
+    /// <summary>
+    /// Emite logs de auditoria para rastreabilidade de pedidos rejeitados ou suspeitos de fraude.
+    /// </summary>
+    private void RegistrarLogsAuditoria(IReadOnlyList<PedidoProcessado> pedidos, DateOnly dataReferencia)
+    {
+        var rejeitados = 0;
+        var suspeitos = 0;
+
+        foreach (var pedido in pedidos)
+        {
+            if (pedido.Status == StatusPedido.Rejeitado)
+            {
+                rejeitados++;
+                _logger.LogWarning(
+                    "[AUDITORIA - REJEITADO] PedidoId: {PedidoId} | ClienteId: {ClienteId} | Procedimento: {TipoProcedimento} | Data: {DataProcedimento:yyyy-MM-dd} | ValorPago: {ValorPago:C} | Motivo: {Motivo}",
+                    pedido.Id,
+                    pedido.ClienteId,
+                    pedido.TipoProcedimento,
+                    pedido.DataProcedimento,
+                    pedido.ValorPago,
+                    pedido.MotivoDetalhe);
+            }
+            else if (pedido.Status == StatusPedido.SuspeitoDeFraude)
+            {
+                suspeitos++;
+                _logger.LogWarning(
+                    "[AUDITORIA - SUSPEITA DE FRAUDE] PedidoId: {PedidoId} | ClienteId: {ClienteId} | Procedimento: {TipoProcedimento} | Data: {DataProcedimento:yyyy-MM-dd} | ValorPago: {ValorPago:C} | ValorCalculado: {ValorReembolsado:C} | Motivo: {Motivo}",
+                    pedido.Id,
+                    pedido.ClienteId,
+                    pedido.TipoProcedimento,
+                    pedido.DataProcedimento,
+                    pedido.ValorPago,
+                    pedido.ValorReembolsado,
+                    pedido.MotivoDetalhe);
+            }
+        }
+
+        if (rejeitados > 0 || suspeitos > 0)
+        {
+            _logger.LogInformation(
+                "[AUDITORIA - RESUMO DO LOTE] DataReferencia: {DataRef:yyyy-MM-dd} | Total: {Total} | Aprovados: {Aprovados} | Rejeitados: {Rejeitados} | Suspeitos: {Suspeitos}",
+                dataReferencia,
+                pedidos.Count,
+                pedidos.Count - rejeitados - suspeitos,
+                rejeitados,
+                suspeitos);
+        }
     }
 }
